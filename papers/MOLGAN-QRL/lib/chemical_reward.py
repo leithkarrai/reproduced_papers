@@ -54,7 +54,6 @@ def evaluate_and_reward(adj_tensor, node_matrix):
             
         rc_scores.append([score])
         
-    # Calcul des métriques globales du batch
     valid_ratio = len(valid_smiles) / batch_size
     unique_ratio = len(set(valid_smiles)) / len(valid_smiles) if len(valid_smiles) > 0 else 0.0
         

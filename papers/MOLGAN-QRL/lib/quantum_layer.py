@@ -30,7 +30,6 @@ class PhotonicRewardModule(nn.Module):
             n_photons=nb_photons
         )
         
-        # 3. MAPPING CLASSIQUE AVAL
         q_out_dim = self.quantum_layer.output_size if hasattr(self.quantum_layer, 'output_size') else nb_modes
         self.mapping = nn.Sequential(
             nn.Linear(q_out_dim, 16),
@@ -40,19 +39,14 @@ class PhotonicRewardModule(nn.Module):
         )
 
     def forward(self, adj_tensor, node_matrix):
-        # A. Concaténation des tenseurs du graphe
         flat_adj = adj_tensor.flatten(start_dim=1)
         flat_nodes = node_matrix.flatten(start_dim=1)
         x = torch.cat([flat_adj, flat_nodes], dim=1)
         
-        # B. Réduction en angles [0, 2pi] 
-        # (CORRECTION 2 : L'ancienne ligne self.encoder a été supprimée)
         pca_out = self.pca_layer(x)
         angles = self.normalization(pca_out) * (2 * torch.pi)
         
-        # C. Passage dans l'interféromètre MerLin
         q_out = self.quantum_layer(angles)
         
-        # D. Prédiction finale du Reward Quantique RQ
         r_q = self.mapping(q_out)
         return r_q

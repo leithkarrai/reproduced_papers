@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 # A AJUSTER : Importez vos classes depuis votre fichier (ex: gan_models.py)
-from WGAN import Generator, Discriminator
+from lib.WGAN import Generator, Discriminator
 
 @pytest.fixture
 def gan_config():
