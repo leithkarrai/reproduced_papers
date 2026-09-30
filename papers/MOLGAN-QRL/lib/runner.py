@@ -1,27 +1,24 @@
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
-from sklearn.decomposition import PCA
 import torch
 import torch.nn.functional as F
+from lib.chemical_reward import evaluate_and_reward
+from lib.quantum_layer import PhotonicRewardModule
+from lib.WGAN import Discriminator, Generator, gradient_penalty
+from sklearn.decomposition import PCA
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.datasets import QM9
 from torch_geometric.utils import to_dense_adj, to_dense_batch
 
-from lib.chemical_reward import evaluate_and_reward
-from lib.quantum_layer import PhotonicRewardModule
-from lib.WGAN import Discriminator, Generator, gradient_penalty
-
-
 
 def get_default_config() -> dict:
     cfg_path = Path(__file__).resolve().parent.parent / "configs" / "defaults.json"
-    with open(cfg_path, "r", encoding="utf-8") as f:
+    with open(cfg_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -256,7 +253,7 @@ def train_and_evaluate(*args, **kwargs):
             f"Val: {val_ratio:.2f} | "
             f"Uniq: {uniq_ratio:.2f} | "
             f"Lambda: {current_lambda:.2f} | "
-            f"Temps: {elapsed:.2f}s"
+            f"Time: {elapsed:.2f}s"
         )
         torch.save(G.state_dict(), cfg["save_model_path"])
 

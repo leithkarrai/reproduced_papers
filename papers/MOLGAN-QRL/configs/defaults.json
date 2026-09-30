@@ -1,5 +1,5 @@
 {
-  "description": "Configuration par défaut pour la reproduction de MolGAN-QRL sur QM9",
+  "description": "Default configuration for MOLGAN-QRL on QM9 dataset.",
   "data_dir": "data/QM9",
   "target_sample_count": 5000,
   "n_nodes": 9,

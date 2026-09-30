@@ -1,13 +1,12 @@
 import torch
 import torch.nn.functional as F
+from lib.chemical_reward import ATOM_TYPES, BOND_TYPES
+from lib.WGAN import Generator
 from rdkit import Chem
 from rdkit.Chem import Draw
-from rdkit.Chem import Descriptors
 from rdkit.Chem.QED import qed
-from lib.chemical_reward import evaluate_and_reward, ATOM_TYPES, BOND_TYPES
-from lib.WGAN import Generator
 
-# 1. Configuration 
+# 1. Configuration
 z_dim = 8
 N_nodes = 9
 N_atoms = 5
@@ -31,7 +30,7 @@ G.eval()
 with torch.no_grad():
     z = torch.randn(num_samples, z_dim).to(device)
     edges_logits, nodes_logits = G(z)
-    
+
     fake_adj = F.gumbel_softmax(edges_logits, tau=1.0, hard=True, dim=-1)
     fake_nodes = F.gumbel_softmax(nodes_logits, tau=1.0, hard=True, dim=-1)
 
@@ -45,35 +44,35 @@ qed_scores = []
 for i in range(num_samples):
     mol = Chem.RWMol()
     node_indices = []
-    
+
     for atom_idx in nodes_discrete[i]:
         atom_symbol = ATOM_TYPES[atom_idx]
         idx = mol.AddAtom(Chem.Atom(atom_symbol))
         node_indices.append(idx)
-        
+
     num_atoms = len(node_indices)
     for j in range(num_atoms):
         for k in range(j + 1, num_atoms):
             bond_type_idx = adj_discrete[i, j, k]
-            if bond_type_idx > 0: 
+            if bond_type_idx > 0:
                 bond = BOND_TYPES.get(bond_type_idx)
                 if bond:
                     try:
                         mol.AddBond(node_indices[j], node_indices[k], bond)
                     except Exception:
-                        pass 
-                        
+                        pass
+
     try:
         Chem.SanitizeMol(mol)
         smiles = Chem.MolToSmiles(mol)
-        
+
         score_qed = qed(mol)
-        
+
         if smiles not in valid_smiles and score_qed >= 0.5:
             valid_smiles.append(smiles)
             valid_mols.append(mol)
             qed_scores.append(score_qed)
-            
+
     except Exception:
         pass
 
@@ -88,7 +87,7 @@ if nvu_score > 0:
 if nvu_score > 0:
     sorted_pairs = sorted(zip(valid_mols, qed_scores), key=lambda x: x[1], reverse=True)
     best_mols = [item[0] for item in sorted_pairs[:16]]
-    
+
     img = Draw.MolsToGridImage(best_mols, molsPerRow=4, subImgSize=(200, 200), returnPNG=False)
     img.save("best_drug_candidates.png")
     print("\n An image of the best filtered molecule have been loaded on : 'best_drug_candidates.png'.")

@@ -77,41 +77,41 @@
   "tau": {
     "flags": ["--tau"],
     "type": "float",
-    "help": "Température pour Gumbel-Softmax"
+    "help": "Temperature for gumbell softmax"
   },
   "warmup_epochs": {
     "flags": ["--warmup-epochs"],
     "type": "int",
-    "help": "Époques de chauffe où lambda_RL = 0"
+    "help": "warmup for RL"
   },
   "ramp_epochs": {
     "flags": ["--ramp-epochs"],
     "type": "int",
-    "help": "Durée de la rampe linéaire d'augmentation de lambda_RL"
+    "help": "Time duration of the RL linear ramp."
   },
   "lambda_max": {
     "flags": ["--lambda-max"],
     "type": "float",
-    "help": "Valeur maximale du coefficient de renforcement RL"
+    "help": "Maximum values for RL coefficient"
   },
   "ema_beta": {
     "flags": ["--ema-beta"],
     "type": "float",
-    "help": "Facteur d'atténuation EMA pour le suivi de la récompense quantique"
+    "help": "EMA absorption factor for quantum reward tracking"
   },
   "log_dir": {
     "flags": ["--log-dir"],
     "type": "str",
-    "help": "Répertoire pour les logs TensorBoard"
+    "help": "Directory for TensorBoard logs"
   },
   "save_model_path": {
     "flags": ["--save-model-path"],
     "type": "str",
-    "help": "Chemin de sauvegarde des poids finaux du générateur"
+    "help": "Path to save the final generator weights"
   },
   "seed": {
     "flags": ["--seed"],
     "type": "int",
-    "help": "Graine aléatoire pour la reproductibilité (optionnel)"
+    "help": "Random seed for reproducibility (optional)"
   }
 }

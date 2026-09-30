@@ -1,11 +1,12 @@
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
-import numpy as np
 
-# A AJUSTER : Remplacez 'nom_de_votre_fichier' par le nom du fichier Python 
+# A AJUSTER : Remplacez 'nom_de_votre_fichier' par le nom du fichier Python
 # qui contient la classe PhotonicRewardModule
 from lib.quantum_layer import PhotonicRewardModule
+
 
 @pytest.fixture
 def setup_data():
@@ -54,16 +55,16 @@ def test_forward_shape_and_bounds(model, setup_data):
 
     # Vérification des dimensions
     assert output.shape == (batch_size, 1), f"Format attendu: {(batch_size, 1)}, obtenu: {output.shape}"
-    
+
     # Vérification des bornes (la dernière couche est une Sigmoïde, donc dans [0, 1])
     assert torch.all(output >= 0.0) and torch.all(output <= 1.0), "La sortie n'est pas bornée entre 0 et 1."
 
 def test_backward_and_gradients(model, setup_data):
     adj_tensor, node_matrix, target, _, _ = setup_data
-    
+
     model.train()
     output = model(adj_tensor, node_matrix)
-    
+
     criterion = nn.MSELoss()
     loss = criterion(output, target)
     loss.backward()
@@ -81,21 +82,21 @@ def test_backward_and_gradients(model, setup_data):
 
 def test_optimizer_step(model, setup_data):
     adj_tensor, node_matrix, target, _, _ = setup_data
-    
+
     # On filtre les paramètres pour ne donner à l'optimiseur que ceux qui s'entraînent
     trainable_params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.Adam(trainable_params, lr=0.01)
-    
+
     # Sauvegarde des poids avant l'étape d'optimisation
     weights_before = {name: param.clone() for name, param in model.named_parameters()}
-    
+
     model.train()
     optimizer.zero_grad()
     output = model(adj_tensor, node_matrix)
     loss = nn.MSELoss()(output, target)
     loss.backward()
     optimizer.step()
-    
+
     # Vérification de la mise à jour des poids
     for name, param in model.named_parameters():
         if param.requires_grad:
