@@ -2,15 +2,16 @@ import torch
 from rdkit import Chem, RDLogger
 from rdkit.Chem import QED
 
-RDLogger.DisableLog('rdApp.*')
+RDLogger.DisableLog("rdApp.*")
 
-ATOM_TYPES = ['C', 'N', 'O', 'F', 'P']
+ATOM_TYPES = ["C", "N", "O", "F", "P"]
 BOND_TYPES = {
     1: Chem.rdchem.BondType.SINGLE,
     2: Chem.rdchem.BondType.DOUBLE,
     3: Chem.rdchem.BondType.TRIPLE,
-    4: Chem.rdchem.BondType.AROMATIC
+    4: Chem.rdchem.BondType.AROMATIC,
 }
+
 
 def evaluate_and_reward(adj_tensor, node_matrix):
     """
@@ -69,7 +70,11 @@ def evaluate_and_reward(adj_tensor, node_matrix):
         rc_scores.append([score])
 
     valid_ratio = len(valid_smiles) / batch_size
-    unique_ratio = len(set(valid_smiles)) / len(valid_smiles) if len(valid_smiles) > 0 else 0.0
+    unique_ratio = (
+        len(set(valid_smiles)) / len(valid_smiles) if len(valid_smiles) > 0 else 0.0
+    )
 
-    reward_tensor = torch.tensor(rc_scores, dtype=torch.float32, device=adj_tensor.device)
+    reward_tensor = torch.tensor(
+        rc_scores, dtype=torch.float32, device=adj_tensor.device
+    )
     return reward_tensor, valid_ratio, unique_ratio

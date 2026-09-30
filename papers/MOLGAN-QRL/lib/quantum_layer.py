@@ -9,7 +9,17 @@ class PhotonicRewardModule(nn.Module):
     Hybrid quantum-classical module that evaluates molecular graphs using
     a continuous-variable photonic quantum circuit.
     """
-    def __init__(self, pca_components, pca_mean, num_atoms=9, num_bonds=4, num_atom_types=5, nb_modes=6, nb_photons=2):
+
+    def __init__(
+        self,
+        pca_components,
+        pca_mean,
+        num_atoms=9,
+        num_bonds=4,
+        num_atom_types=5,
+        nb_modes=6,
+        nb_photons=2,
+    ):
         """
         Initializes the fixed PCA projection layer, the parameterized photonic circuit,
         and the classical post-processing mapping network.
@@ -30,7 +40,9 @@ class PhotonicRewardModule(nn.Module):
         self.pca_layer = nn.Linear(in_dim, nb_modes)
         self.pca_layer.weight.data = torch.tensor(pca_components, dtype=torch.float32)
 
-        bias = -torch.tensor(pca_mean, dtype=torch.float32) @ self.pca_layer.weight.data.T
+        bias = (
+            -torch.tensor(pca_mean, dtype=torch.float32) @ self.pca_layer.weight.data.T
+        )
         self.pca_layer.bias.data = bias
 
         self.pca_layer.requires_grad_(False)
@@ -42,17 +54,16 @@ class PhotonicRewardModule(nn.Module):
         builder.add_rotations(trainable=True, name="Theta")
 
         self.quantum_layer = QuantumLayer(
-            input_size=nb_modes,
-            builder=builder,
-            n_photons=nb_photons
+            input_size=nb_modes, builder=builder, n_photons=nb_photons
         )
 
-        q_out_dim = self.quantum_layer.output_size if hasattr(self.quantum_layer, 'output_size') else nb_modes
+        q_out_dim = (
+            self.quantum_layer.output_size
+            if hasattr(self.quantum_layer, "output_size")
+            else nb_modes
+        )
         self.mapping = nn.Sequential(
-            nn.Linear(q_out_dim, 16),
-            nn.ReLU(),
-            nn.Linear(16, 1),
-            nn.Sigmoid()
+            nn.Linear(q_out_dim, 16), nn.ReLU(), nn.Linear(16, 1), nn.Sigmoid()
         )
 
     def forward(self, adj_tensor, node_matrix):

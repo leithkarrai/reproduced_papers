@@ -16,7 +16,7 @@ def setup_data():
     num_bonds = 4
     num_atom_types = 5
     nb_modes = 6
-    in_dim = (num_atoms * num_atoms * num_bonds) + (num_atoms * num_atom_types) # 369
+    in_dim = (num_atoms * num_atoms * num_bonds) + (num_atoms * num_atom_types)  # 369
 
     # Tenseurs d'entrée (Graphe)
     adj_tensor = torch.rand(batch_size, num_atoms, num_atoms, num_bonds)
@@ -31,6 +31,7 @@ def setup_data():
 
     return adj_tensor, node_matrix, target, pca_components, pca_mean
 
+
 @pytest.fixture
 def model(setup_data):
     """Instancie le modèle avec les paramètres ACP générés."""
@@ -41,8 +42,9 @@ def model(setup_data):
         num_atoms=9,
         num_bonds=4,
         num_atom_types=5,
-        nb_modes=6
+        nb_modes=6,
     )
+
 
 def test_forward_shape_and_bounds(model, setup_data):
     adj_tensor, node_matrix, _, _, _ = setup_data
@@ -54,10 +56,15 @@ def test_forward_shape_and_bounds(model, setup_data):
         output = model(adj_tensor, node_matrix)
 
     # Vérification des dimensions
-    assert output.shape == (batch_size, 1), f"Format attendu: {(batch_size, 1)}, obtenu: {output.shape}"
+    assert output.shape == (batch_size, 1), (
+        f"Format attendu: {(batch_size, 1)}, obtenu: {output.shape}"
+    )
 
     # Vérification des bornes (la dernière couche est une Sigmoïde, donc dans [0, 1])
-    assert torch.all(output >= 0.0) and torch.all(output <= 1.0), "La sortie n'est pas bornée entre 0 et 1."
+    assert torch.all(output >= 0.0) and torch.all(output <= 1.0), (
+        "La sortie n'est pas bornée entre 0 et 1."
+    )
+
 
 def test_backward_and_gradients(model, setup_data):
     adj_tensor, node_matrix, target, _, _ = setup_data
@@ -73,12 +80,19 @@ def test_backward_and_gradients(model, setup_data):
     for name, param in model.named_parameters():
         if param.requires_grad:
             # Les couches entraînables (Circuit quantique + Mapping) DOIVENT avoir un gradient
-            assert param.grad is not None, f"Le paramètre entraînable '{name}' n'a pas reçu de gradient."
-            assert torch.sum(torch.abs(param.grad)) > 0, f"Le gradient de '{name}' est nul."
+            assert param.grad is not None, (
+                f"Le paramètre entraînable '{name}' n'a pas reçu de gradient."
+            )
+            assert torch.sum(torch.abs(param.grad)) > 0, (
+                f"Le gradient de '{name}' est nul."
+            )
         else:
             # La couche ACP NE DOIT PAS avoir de gradient
-            assert param.grad is None, f"Erreur : le paramètre gelé '{name}' a reçu un gradient !"
+            assert param.grad is None, (
+                f"Erreur : le paramètre gelé '{name}' a reçu un gradient !"
+            )
             assert "pca" in name.lower(), f"Un paramètre inattendu a été gelé : {name}"
+
 
 def test_optimizer_step(model, setup_data):
     adj_tensor, node_matrix, target, _, _ = setup_data
@@ -101,7 +115,11 @@ def test_optimizer_step(model, setup_data):
     for name, param in model.named_parameters():
         if param.requires_grad:
             # Les poids du circuit et du mapping doivent avoir changé
-            assert not torch.equal(weights_before[name], param), f"Les poids de '{name}' n'ont pas été mis à jour."
+            assert not torch.equal(weights_before[name], param), (
+                f"Les poids de '{name}' n'ont pas été mis à jour."
+            )
         else:
             # Les poids de l'ACP doivent rester rigoureusement identiques
-            assert torch.equal(weights_before[name], param), f"Erreur : les poids gelés de '{name}' ont été modifiés !"
+            assert torch.equal(weights_before[name], param), (
+                f"Erreur : les poids gelés de '{name}' ont été modifiés !"
+            )

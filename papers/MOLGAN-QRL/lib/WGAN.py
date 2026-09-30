@@ -9,6 +9,7 @@ class Generator(nn.Module):
     MolGAN Generator network that transforms latent noise vectors into dense molecular
     adjacency and node feature matrices.
     """
+
     def __init__(self, conv_dims, z_dim, vertexes, edges, nodes, dropout_rate):
         """
         Initializes the generator architecture layers.
@@ -44,7 +45,9 @@ class Generator(nn.Module):
                 - nodes_logits: Generated node feature logits of shape (batch_size, vertexes, nodes).
         """
         output = self.multi_dense_layer(x)
-        edges_logits = self.edges_layer(output).view(-1, self.edges, self.vertexes, self.vertexes)
+        edges_logits = self.edges_layer(output).view(
+            -1, self.edges, self.vertexes, self.vertexes
+        )
         edges_logits = (edges_logits + edges_logits.permute(0, 1, 3, 2)) / 2
         edges_logits = self.dropout(edges_logits.permute(0, 2, 3, 1))
 
@@ -58,7 +61,8 @@ class Discriminator(nn.Module):
     WGAN Discriminator network utilizing graph convolutions and graph aggregation
     to evaluate the realism of molecular graphs.
     """
-    def __init__(self, conv_dim, m_dim, b_dim, dropout_rate=0.):
+
+    def __init__(self, conv_dim, m_dim, b_dim, dropout_rate=0.0):
         """
         Initializes the graph convolutional blocks and output linear layers of the discriminator.
 
@@ -71,9 +75,20 @@ class Discriminator(nn.Module):
         super().__init__()
         self.activation_f = torch.nn.Tanh()
         graph_conv_dim, aux_dim, linear_dim = conv_dim
-        self.gcn_layer = GraphConvolution(m_dim, graph_conv_dim, b_dim, False, 0, dropout_rate)
-        self.agg_layer = GraphAggregation(graph_conv_dim[-1] + m_dim, aux_dim, self.activation_f, False, 0, dropout_rate)
-        self.multi_dense_layer = MultiDenseLayer(aux_dim, linear_dim, self.activation_f, dropout_rate=dropout_rate)
+        self.gcn_layer = GraphConvolution(
+            m_dim, graph_conv_dim, b_dim, False, 0, dropout_rate
+        )
+        self.agg_layer = GraphAggregation(
+            graph_conv_dim[-1] + m_dim,
+            aux_dim,
+            self.activation_f,
+            False,
+            0,
+            dropout_rate,
+        )
+        self.multi_dense_layer = MultiDenseLayer(
+            aux_dim, linear_dim, self.activation_f, dropout_rate=dropout_rate
+        )
         self.output_layer = nn.Linear(linear_dim[-1], 1, bias=False)
 
     def forward(self, adj, hidden, node):
@@ -122,11 +137,17 @@ def gradient_penalty(D, real_nodes, real_adj, fake_nodes, fake_adj, device):
 
     fake = torch.ones(real_nodes.shape[0], 1).to(device)
     gradients = autograd.grad(
-        outputs=d_interpolates, inputs=(int_nodes, int_adj), grad_outputs=fake,
-        create_graph=True, retain_graph=True, only_inputs=True
+        outputs=d_interpolates,
+        inputs=(int_nodes, int_adj),
+        grad_outputs=fake,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
     )
 
     grad_nodes = gradients[0].view(gradients[0].size(0), -1)
     grad_adj = gradients[1].view(gradients[1].size(0), -1)
-    grad_norm = torch.sqrt(torch.sum(grad_nodes ** 2, dim=1) + torch.sum(grad_adj ** 2, dim=1))
+    grad_norm = torch.sqrt(
+        torch.sum(grad_nodes**2, dim=1) + torch.sum(grad_adj**2, dim=1)
+    )
     return ((grad_norm - 1) ** 2).mean()

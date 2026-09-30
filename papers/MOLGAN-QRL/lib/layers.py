@@ -7,7 +7,8 @@ class GraphConvolutionLayer(Module):
     """
     Performs a single graph convolution operation handling multiple bond/edge types.
     """
-    def __init__(self, in_features, u, activation, edge_type_num, dropout_rate=0.):
+
+    def __init__(self, in_features, u, activation, edge_type_num, dropout_rate=0.0):
         """
         Initializes the graph convolution layer.
 
@@ -45,7 +46,9 @@ class GraphConvolutionLayer(Module):
         else:
             annotations = n_tensor
 
-        output = torch.stack([self.adj_list[i](annotations) for i in range(self.edge_type_num)], 1)
+        output = torch.stack(
+            [self.adj_list[i](annotations) for i in range(self.edge_type_num)], 1
+        )
         output = torch.matmul(adj_tensor, output)
         out_sum = torch.sum(output, 1)
         out_linear_2 = self.linear_2(annotations)
@@ -59,7 +62,17 @@ class MultiGraphConvolutionLayers(Module):
     """
     Sequentially stacks multiple GraphConvolutionLayers to process graph structures deeply.
     """
-    def __init__(self, in_features, units, activation, edge_type_num, with_features=False, f=0, dropout_rate=0.):
+
+    def __init__(
+        self,
+        in_features,
+        units,
+        activation,
+        edge_type_num,
+        with_features=False,
+        f=0,
+        dropout_rate=0.0,
+    ):
         """
         Initializes the sequence of graph convolution layers.
 
@@ -79,13 +92,21 @@ class MultiGraphConvolutionLayers(Module):
         if with_features:
             for _i in range(len(self.units)):
                 in_units = [x + in_features for x in self.units]
-            for u0, u1 in zip([in_features+f] + in_units[:-1], self.units):
-                self.conv_nets.append(GraphConvolutionLayer(u0, u1, activation, edge_type_num, dropout_rate))
+            for u0, u1 in zip([in_features + f] + in_units[:-1], self.units):
+                self.conv_nets.append(
+                    GraphConvolutionLayer(
+                        u0, u1, activation, edge_type_num, dropout_rate
+                    )
+                )
         else:
             for _i in range(len(self.units)):
                 in_units = [x + in_features for x in self.units]
             for u0, u1 in zip([in_features] + in_units[:-1], self.units):
-                self.conv_nets.append(GraphConvolutionLayer(u0, u1, activation, edge_type_num, dropout_rate))
+                self.conv_nets.append(
+                    GraphConvolutionLayer(
+                        u0, u1, activation, edge_type_num, dropout_rate
+                    )
+                )
 
     def forward(self, n_tensor, adj_tensor, h_tensor=None):
         """
@@ -101,7 +122,9 @@ class MultiGraphConvolutionLayers(Module):
         """
         hidden_tensor = h_tensor
         for conv_idx in range(len(self.units)):
-            hidden_tensor = self.conv_nets[conv_idx](n_tensor, adj_tensor, hidden_tensor)
+            hidden_tensor = self.conv_nets[conv_idx](
+                n_tensor, adj_tensor, hidden_tensor
+            )
         return hidden_tensor
 
 
@@ -109,7 +132,16 @@ class GraphConvolution(Module):
     """
     High-level wrapper module initializing and executing multi-layer graph convolutions with Tanh activation.
     """
-    def __init__(self, in_features, graph_conv_units, edge_type_num, with_features=False, f_dim=0, dropout_rate=0.):
+
+    def __init__(
+        self,
+        in_features,
+        graph_conv_units,
+        edge_type_num,
+        with_features=False,
+        f_dim=0,
+        dropout_rate=0.0,
+    ):
         """
         Initializes the wrapper graph convolution network.
 
@@ -125,9 +157,15 @@ class GraphConvolution(Module):
         self.in_features = in_features
         self.graph_conv_units = graph_conv_units
         self.activation_f = torch.nn.Tanh()
-        self.multi_graph_convolution_layers = \
-            MultiGraphConvolutionLayers(in_features, self.graph_conv_units, self.activation_f, edge_type_num,
-                                        with_features, f_dim, dropout_rate)
+        self.multi_graph_convolution_layers = MultiGraphConvolutionLayers(
+            in_features,
+            self.graph_conv_units,
+            self.activation_f,
+            edge_type_num,
+            with_features,
+            f_dim,
+            dropout_rate,
+        )
 
     def forward(self, n_tensor, adj_tensor, h_tensor=None):
         """
@@ -149,6 +187,7 @@ class GraphConvolution2(Module):
     """
     Alternative two-step graph convolution implementation using Einstein summation (einsum).
     """
+
     def __init__(self, in_features, out_feature_list, b_dim, dropout):
         """
         Initializes alternative graph convolution components.
@@ -181,13 +220,13 @@ class GraphConvolution2(Module):
             torch.Tensor: Convolution output tensor.
         """
         hidden = torch.stack([self.linear1(inputs) for _ in range(adj.size(1))], 1)
-        hidden = torch.einsum('bijk,bikl->bijl', (adj, hidden))
+        hidden = torch.einsum("bijk,bikl->bijl", (adj, hidden))
         hidden = torch.sum(hidden, 1) + self.linear1(inputs)
         hidden = activation(hidden) if activation is not None else hidden
         hidden = self.dropout(hidden)
 
         output = torch.stack([self.linear2(hidden) for _ in range(adj.size(1))], 1)
-        output = torch.einsum('bijk,bikl->bijl', (adj, output))
+        output = torch.einsum("bijk,bikl->bijl", (adj, output))
         output = torch.sum(output, 1) + self.linear2(hidden)
         output = activation(output) if activation is not None else output
         output = self.dropout(output)
@@ -199,8 +238,16 @@ class GraphAggregation(Module):
     """
     Aggregates node-level representations into a graph-level vector using an attention-like mechanism.
     """
-    def __init__(self, in_features, aux_units, activation, with_features=False, f_dim=0,
-                 dropout_rate=0.):
+
+    def __init__(
+        self,
+        in_features,
+        aux_units,
+        activation,
+        with_features=False,
+        f_dim=0,
+        dropout_rate=0.0,
+    ):
         """
         Initializes gating/attention layers for aggregation.
 
@@ -216,15 +263,15 @@ class GraphAggregation(Module):
         self.with_features = with_features
         self.activation = activation
         if self.with_features:
-            self.i = nn.Sequential(nn.Linear(in_features+f_dim, aux_units),
-                                   nn.Sigmoid())
-            j_layers = [nn.Linear(in_features+f_dim, aux_units)]
+            self.i = nn.Sequential(
+                nn.Linear(in_features + f_dim, aux_units), nn.Sigmoid()
+            )
+            j_layers = [nn.Linear(in_features + f_dim, aux_units)]
             if self.activation is not None:
                 j_layers.append(self.activation)
             self.j = nn.Sequential(*j_layers)
         else:
-            self.i = nn.Sequential(nn.Linear(in_features, aux_units),
-                                   nn.Sigmoid())
+            self.i = nn.Sequential(nn.Linear(in_features, aux_units), nn.Sigmoid())
             j_layers = [nn.Linear(in_features, aux_units)]
             if self.activation is not None:
                 j_layers.append(self.activation)
@@ -262,6 +309,7 @@ class GraphAggregation2(Module):
     """
     Alternative aggregation mechanism utilizing parallel Sigmoid and Tanh gating layers.
     """
+
     def __init__(self, in_features, out_features, b_dim, dropout):
         """
         Initializes sigmoid and tanh linear sequences.
@@ -273,10 +321,12 @@ class GraphAggregation2(Module):
             dropout (float): Dropout probability.
         """
         super().__init__()
-        self.sigmoid_linear = nn.Sequential(nn.Linear(in_features+b_dim, out_features),
-                                            nn.Sigmoid())
-        self.tanh_linear = nn.Sequential(nn.Linear(in_features+b_dim, out_features),
-                                       nn.Tanh())
+        self.sigmoid_linear = nn.Sequential(
+            nn.Linear(in_features + b_dim, out_features), nn.Sigmoid()
+        )
+        self.tanh_linear = nn.Sequential(
+            nn.Linear(in_features + b_dim, out_features), nn.Tanh()
+        )
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, inputs, activation):
@@ -303,7 +353,8 @@ class MultiDenseLayer(Module):
     """
     A utility container for sequential fully-connected (dense) layers with dropout and activation.
     """
-    def __init__(self, aux_unit, linear_units, activation=None, dropout_rate=0.):
+
+    def __init__(self, aux_unit, linear_units, activation=None, dropout_rate=0.0):
         """
         Initializes a stack of dense layers.
 

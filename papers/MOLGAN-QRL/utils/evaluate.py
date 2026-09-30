@@ -13,7 +13,7 @@ N_atoms = 5
 N_bonds = 5
 num_samples = 497
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 G = Generator([128, 256, 512], z_dim, N_nodes, N_bonds, N_atoms, 0.0).to(device)
 
@@ -82,14 +82,20 @@ nvu_score = len(valid_smiles)
 print("\n--- Results (QED >= 0.5) ---")
 print(f"Number of unique, valid and drug likely molecules (QED >= 0.5) : {nvu_score}")
 if nvu_score > 0:
-    print(f"mean of the scores of those molecules : {sum(qed_scores)/len(qed_scores):.3f}")
+    print(
+        f"mean of the scores of those molecules : {sum(qed_scores) / len(qed_scores):.3f}"
+    )
 
 if nvu_score > 0:
     sorted_pairs = sorted(zip(valid_mols, qed_scores), key=lambda x: x[1], reverse=True)
     best_mols = [item[0] for item in sorted_pairs[:16]]
 
-    img = Draw.MolsToGridImage(best_mols, molsPerRow=4, subImgSize=(200, 200), returnPNG=False)
+    img = Draw.MolsToGridImage(
+        best_mols, molsPerRow=4, subImgSize=(200, 200), returnPNG=False
+    )
     img.save("best_drug_candidates.png")
-    print("\n An image of the best filtered molecule have been loaded on : 'best_drug_candidates.png'.")
+    print(
+        "\n An image of the best filtered molecule have been loaded on : 'best_drug_candidates.png'."
+    )
 else:
     print("\n No molecules have achieve a drug-likelyness score upper than 0.5.")

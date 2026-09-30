@@ -41,7 +41,9 @@ def prepare_data(cfg: dict):
         is_empty = (~mask[0]).float().unsqueeze(1)
         x_final = torch.cat([is_empty, x_dense], dim=1)
 
-        adj_dense = to_dense_adj(data.edge_index, edge_attr=data.edge_attr, max_num_nodes=n_nodes)[0]
+        adj_dense = to_dense_adj(
+            data.edge_index, edge_attr=data.edge_attr, max_num_nodes=n_nodes
+        )[0]
         has_bond = adj_dense.sum(dim=-1)
         no_bond = (has_bond == 0).float().unsqueeze(-1)
         no_bond.diagonal().fill_(1.0)
@@ -60,7 +62,7 @@ def prepare_data(cfg: dict):
     dataloader = DataLoader(
         TensorDataset(stacked_nodes, stacked_adjs),
         batch_size=cfg["batch_size"],
-        shuffle=True
+        shuffle=True,
     )
     return dataloader, stacked_nodes, stacked_adjs
 
@@ -91,7 +93,6 @@ def train_and_evaluate(*args, **kwargs):
         torch.manual_seed(cfg["seed"])
         np.random.seed(cfg["seed"])
 
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"training on : {device}")
 
@@ -107,19 +108,11 @@ def train_and_evaluate(*args, **kwargs):
     d_conv_dims = (cfg["d_conv_dims"][0], cfg["d_conv_dims"][1], cfg["d_conv_dims"][2])
 
     G = Generator(
-        cfg["g_conv_dims"],
-        z_dim,
-        n_nodes,
-        n_bonds,
-        n_atoms,
-        cfg["g_dropout"]
+        cfg["g_conv_dims"], z_dim, n_nodes, n_bonds, n_atoms, cfg["g_dropout"]
     ).to(device)
 
     D = Discriminator(
-        d_conv_dims,
-        m_dim=n_atoms,
-        b_dim=n_bonds - 1,
-        dropout_rate=cfg["d_dropout"]
+        d_conv_dims, m_dim=n_atoms, b_dim=n_bonds - 1, dropout_rate=cfg["d_dropout"]
     ).to(device)
 
     print("ACP Computation...")
@@ -136,7 +129,7 @@ def train_and_evaluate(*args, **kwargs):
         num_atoms=n_nodes,
         num_bonds=n_bonds,
         num_atom_types=n_atoms,
-        nb_modes=cfg["nb_modes"]
+        nb_modes=cfg["nb_modes"],
     ).to(device)
 
     opt_g = torch.optim.RMSprop(G.parameters(), lr=cfg["lr_g"])
@@ -172,20 +165,25 @@ def train_and_evaluate(*args, **kwargs):
             batch_size = batch_nodes.size(0)
             batch_nodes, batch_adj = batch_nodes.to(device), batch_adj.to(device)
 
-
             for _ in range(n_critic):
                 opt_d.zero_grad()
                 z = torch.randn(batch_size, z_dim, device=device)
 
                 with torch.no_grad():
                     edges_logits, nodes_logits = G(z)
-                    fake_adj = F.gumbel_softmax(edges_logits, tau=tau, hard=True, dim=-1)
-                    fake_nodes = F.gumbel_softmax(nodes_logits, tau=tau, hard=True, dim=-1)
+                    fake_adj = F.gumbel_softmax(
+                        edges_logits, tau=tau, hard=True, dim=-1
+                    )
+                    fake_nodes = F.gumbel_softmax(
+                        nodes_logits, tau=tau, hard=True, dim=-1
+                    )
 
                 real_val = D(batch_adj, None, batch_nodes)
                 fake_val = D(fake_adj, None, fake_nodes)
 
-                gp = gradient_penalty(D, batch_nodes, batch_adj, fake_nodes, fake_adj, device)
+                gp = gradient_penalty(
+                    D, batch_nodes, batch_adj, fake_nodes, fake_adj, device
+                )
                 d_loss = -torch.mean(real_val) + torch.mean(fake_val) + (lambda_gp * gp)
 
                 d_loss.backward()
@@ -195,27 +193,35 @@ def train_and_evaluate(*args, **kwargs):
             with torch.no_grad():
                 z = torch.randn(batch_size, z_dim, device=device)
                 edges_logits, nodes_logits = G(z)
-                fake_adj_hard = F.gumbel_softmax(edges_logits, tau=tau, hard=True, dim=-1)
-                fake_nodes_hard = F.gumbel_softmax(nodes_logits, tau=tau, hard=True, dim=-1)
-                target_rc_fake, val_ratio, uniq_ratio = evaluate_and_reward(fake_adj_hard, fake_nodes_hard)
+                fake_adj_hard = F.gumbel_softmax(
+                    edges_logits, tau=tau, hard=True, dim=-1
+                )
+                fake_nodes_hard = F.gumbel_softmax(
+                    nodes_logits, tau=tau, hard=True, dim=-1
+                )
+                target_rc_fake, val_ratio, uniq_ratio = evaluate_and_reward(
+                    fake_adj_hard, fake_nodes_hard
+                )
                 target_rc_real, _, _ = evaluate_and_reward(batch_adj, batch_nodes)
 
             pred_rq_fake = Q(fake_adj_hard, fake_nodes_hard)
             pred_rq_real = Q(batch_adj, batch_nodes)
 
             q_loss = torch.mean(
-                torch.abs(pred_rq_real - target_rc_real) + torch.abs(pred_rq_fake - target_rc_fake)
+                torch.abs(pred_rq_real - target_rc_real)
+                + torch.abs(pred_rq_fake - target_rc_fake)
             )
             q_loss.backward()
             opt_q.step()
-
 
             opt_g.zero_grad()
             z = torch.randn(batch_size, z_dim, device=device)
             edges_logits, nodes_logits = G(z)
 
             fake_adj_soft = F.gumbel_softmax(edges_logits, tau=tau, hard=False, dim=-1)
-            fake_nodes_soft = F.gumbel_softmax(nodes_logits, tau=tau, hard=False, dim=-1)
+            fake_nodes_soft = F.gumbel_softmax(
+                nodes_logits, tau=tau, hard=False, dim=-1
+            )
 
             fake_val = D(fake_adj_soft, None, fake_nodes_soft)
             g_loss_wgan = -torch.mean(fake_val)
@@ -226,18 +232,24 @@ def train_and_evaluate(*args, **kwargs):
             if global_step == 0:
                 reward_ema = instant_reward_tensor.item()
             else:
-                reward_ema = ema_beta * reward_ema + (1.0 - ema_beta) * instant_reward_tensor.item()
+                reward_ema = (
+                    ema_beta * reward_ema
+                    + (1.0 - ema_beta) * instant_reward_tensor.item()
+                )
 
-            g_loss_total = (1.0 - current_lambda) * g_loss_wgan + current_lambda * (-instant_reward_tensor)
+            g_loss_total = (1.0 - current_lambda) * g_loss_wgan + current_lambda * (
+                -instant_reward_tensor
+            )
             g_loss_total.backward()
             opt_g.step()
-
 
             writer.add_scalar("Loss/Discriminator", d_loss.item(), global_step)
             writer.add_scalar("Loss/Generator_Total", g_loss_total.item(), global_step)
             writer.add_scalar("Loss/Generator_WGAN", g_loss_wgan.item(), global_step)
             writer.add_scalar("Photonic/L1_Loss", q_loss.item(), global_step)
-            writer.add_scalar("Reward/Average_RDKit_Rc", target_rc_fake.mean().item(), global_step)
+            writer.add_scalar(
+                "Reward/Average_RDKit_Rc", target_rc_fake.mean().item(), global_step
+            )
             writer.add_scalar("Reward/EMA_Quantum_Rq", reward_ema, global_step)
             writer.add_scalar("Metrics/Validity", val_ratio, global_step)
             writer.add_scalar("Metrics/Uniqueness", uniq_ratio, global_step)
@@ -264,7 +276,7 @@ def train_and_evaluate(*args, **kwargs):
         "status": "success",
         "saved_model": cfg.get("save_model_path"),
         "final_validity": val_ratio,
-        "final_uniqueness": uniq_ratio
+        "final_uniqueness": uniq_ratio,
     }
 
 
