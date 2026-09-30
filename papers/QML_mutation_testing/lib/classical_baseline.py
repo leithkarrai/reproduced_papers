@@ -34,31 +34,31 @@ def _train_torch_classifier(model, splits, epochs, lr, seed):
     torch.manual_seed(seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = torch.nn.CrossEntropyLoss()
-    
-    for epoch in range(epochs):
+
+    for _epoch in range(epochs):
         model.train()
         optimizer.zero_grad()
-        
+
         x = splits.x_train
         if x.dim() > 2:
             x = x.view(x.size(0), -1)
-            
+
         outputs = model(x)
         loss = loss_fn(outputs, splits.y_train)
         loss.backward()
         optimizer.step()
-        
+
     model.eval()
     with torch.no_grad():
         x_test = splits.x_test
         if x_test.dim() > 2:
             x_test = x_test.view(x_test.size(0), -1)
-        
+
         predictions = model(x_test).argmax(dim=1)
         test_acc = (predictions == splits.y_test).float().mean().item()
-        
+
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    
+
     return {
         "test_accuracy": test_acc,
         "n_parameters": n_params,

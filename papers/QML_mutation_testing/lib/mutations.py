@@ -543,13 +543,13 @@ def suppressed_redundant_counts(ir) -> dict[str, int]:
             n_layers = len(layer_ir.layer_indices())
             total_ls += 2 * (n_layers * (n_layers - 1) // 2)
         return {"LS": total_ls}
-        
 
     n_layers = len(ir.layer_indices())
     layer_pairs = n_layers * (n_layers - 1) // 2
     return {
         "LS": 2 * layer_pairs,
     }
+
 
 def _generate_flat_new_mutants(
     ir: CircuitIR,
@@ -596,30 +596,48 @@ def _generate_flat_new_mutants(
     )
     return mutants
 
-def generate_new_operator_mutants(trained_ir, n_features: int, apc_granularity: str = "gate", ala_seed: int = 42) -> list:
+
+def generate_new_operator_mutants(
+    trained_ir, n_features: int, apc_granularity: str = "gate", ala_seed: int = 42
+) -> list:
     if isinstance(trained_ir, CircuitIR):
-        return _generate_flat_new_mutants(trained_ir, n_features=n_features, apc_granularity=apc_granularity, ala_seed=ala_seed)
-    
+        return _generate_flat_new_mutants(
+            trained_ir,
+            n_features=n_features,
+            apc_granularity=apc_granularity,
+            ala_seed=ala_seed,
+        )
+
     if isinstance(trained_ir, list):
-        return _generate_flat_new_mutants(trained_ir, n_features=n_features, apc_granularity=apc_granularity, ala_seed=ala_seed)
-        
+        return _generate_flat_new_mutants(
+            trained_ir,
+            n_features=n_features,
+            apc_granularity=apc_granularity,
+            ala_seed=ala_seed,
+        )
+
     elif isinstance(trained_ir, dict):
         qcnn_mutants = []
         for layer_idx, layer_ir in trained_ir.items():
-            layer_mutants = _generate_flat_new_mutants(layer_ir, n_features=n_features, apc_granularity=apc_granularity, ala_seed=ala_seed)
+            layer_mutants = _generate_flat_new_mutants(
+                layer_ir,
+                n_features=n_features,
+                apc_granularity=apc_granularity,
+                ala_seed=ala_seed,
+            )
             for mutant in layer_mutants:
-
                 new_ir = None
                 if mutant.ir is not None:
                     new_ir = trained_ir.copy()
                     new_ir[layer_idx] = mutant.ir
-                
 
                 qcnn_mutants.append(
-                    replace(mutant, ir=new_ir, mutant_id=f"L{layer_idx}_{mutant.mutant_id}")
+                    replace(
+                        mutant, ir=new_ir, mutant_id=f"L{layer_idx}_{mutant.mutant_id}"
+                    )
                 )
         return qcnn_mutants
-        
+
     raise TypeError(f"Unsupporter representation format : {type(trained_ir)}")
 
 
@@ -773,10 +791,10 @@ def _generate_flat_baseline_mutants(ir: CircuitIR) -> list[Mutant]:
 def generate_baseline_mutants(trained_ir) -> list:
     if isinstance(trained_ir, CircuitIR):
         return _generate_flat_baseline_mutants(trained_ir)
-    
+
     if isinstance(trained_ir, list):
         return _generate_flat_baseline_mutants(trained_ir)
-        
+
     elif isinstance(trained_ir, dict):
         qcnn_mutants = []
         for layer_idx, layer_ir in trained_ir.items():
@@ -784,33 +802,36 @@ def generate_baseline_mutants(trained_ir) -> list:
             for mutant in layer_mutants:
                 new_ir = trained_ir.copy()
                 new_ir[layer_idx] = mutant.ir
-                
 
                 qcnn_mutants.append(
-                    replace(mutant, ir=new_ir, mutant_id=f"L{layer_idx}_{mutant.mutant_id}")
+                    replace(
+                        mutant, ir=new_ir, mutant_id=f"L{layer_idx}_{mutant.mutant_id}"
+                    )
                 )
         return qcnn_mutants
-        
+
     raise TypeError(f"Unsupported representation type : {type(trained_ir)}")
 
 
 def generate_control_mutants(trained_ir, count: int = 12) -> list:
     if isinstance(trained_ir, CircuitIR):
         return _generate_flat_control_mutants(trained_ir, count=count)
-    
+
     if isinstance(trained_ir, list):
         return _generate_flat_control_mutants(trained_ir, count=count)
-        
+
     elif isinstance(trained_ir, dict):
         qcnn_mutants = []
         for i in range(count):
             mutant_dict = {idx: layer_ir.copy() for idx, layer_ir in trained_ir.items()}
-            qcnn_mutants.append(Mutant(
-                operator=CONTROL_OPERATOR,
-                mutant_id=f"CONTROL_QCNN_{i:02d}",
-                description="unmutated QCNN circuit, re-evaluated with an independent sampling seed (shot-noise control)",
-                ir=mutant_dict
-            ))
+            qcnn_mutants.append(
+                Mutant(
+                    operator=CONTROL_OPERATOR,
+                    mutant_id=f"CONTROL_QCNN_{i:02d}",
+                    description="unmutated QCNN circuit, re-evaluated with an independent sampling seed (shot-noise control)",
+                    ir=mutant_dict,
+                )
+            )
         return qcnn_mutants
-        
+
     raise TypeError(f"Unsupported representation type : {type(trained_ir)}")

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 from lib.data import DatasetSplits
-from lib.photonic_qnn import PhotonicQnnClassifier, PhotonicQnnSpec
+from lib.photonic_qnn import PhotonicQnnClassifier
 from torch import nn
 
 logger = logging.getLogger(__name__)
@@ -64,13 +64,8 @@ def accuracy(model: PhotonicQnnClassifier, x: torch.Tensor, y: torch.Tensor) -> 
         predictions = model(x).argmax(dim=1)
     return (predictions == y).float().mean().item()
 
-def train_photonic_qnn(
-    spec,
-    splits,
-    cfg,
-    seed: int,
-    model=None
-) -> tuple:
+
+def train_photonic_qnn(spec, splits, cfg, seed: int, model=None) -> tuple:
     """Train one photonic QNN and return the model plus its metrics.
 
     Parameters
@@ -93,12 +88,12 @@ def train_photonic_qnn(
     """
 
     torch.manual_seed(seed)
-    
+
     if model is None:
         model = PhotonicQnnClassifier(spec)
-        
+
     optimizer = _build_optimizer(model, cfg)
-    
+
     loss_fn = nn.NLLLoss()
 
     logger.info(
@@ -113,14 +108,12 @@ def train_photonic_qnn(
 
     started = time.time()
     history: list[dict] = []
-    
-    
+
     for epoch in range(1, cfg.epochs + 1):
         model.train()
         optimizer.zero_grad()
-        
-        outputs = model(splits.x_train)
 
+        outputs = model(splits.x_train)
 
         # if torch.isnan(outputs).any():
         #     print("\n!!! DÉTECTION DE NAN PENDANT LE FORWARD PASS !!!")
@@ -132,21 +125,21 @@ def train_photonic_qnn(
         # --- GESTION ROBUSTE DE LA PERTE ---
         # Le modèle d'origine (Iris) renvoie des probas normalisées [0, 1].
         # Le modèle QCNN (MNIST) renvoie des logits bruts [-inf, inf].
-        # La fonction log_softmax de PyTorch s'adapte parfaitement aux deux 
+        # La fonction log_softmax de PyTorch s'adapte parfaitement aux deux
         # situations sans jamais générer de logarithme invalide (NaN).
         log_probs = F.log_softmax(outputs, dim=1)
-        
+
         loss = loss_fn(log_probs, splits.y_train)
         loss.backward()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        
+
         optimizer.step()
 
         if epoch % cfg.log_every == 0 or epoch in (1, cfg.epochs):
             train_accuracy = accuracy(model, splits.x_train, splits.y_train)
             val_accuracy = accuracy(model, splits.x_val, splits.y_val)
-            
+
             history.append(
                 {
                     "epoch": epoch,
@@ -176,7 +169,7 @@ def train_photonic_qnn(
         "train_wall_clock_s": wall_clock,
         "history": history,
     }
-    
+
     logger.info(
         "EVALUATION_COMPLETED | seed=%d | train_acc=%.4f | val_acc=%.4f "
         "| test_acc=%.4f | wall_clock_s=%.2f",
@@ -186,8 +179,9 @@ def train_photonic_qnn(
         metrics["test_accuracy"],
         wall_clock,
     )
-    
+
     return model, metrics
+
 
 def predict_with_shots(
     model: PhotonicQnnClassifier, x: torch.Tensor, shots: int

@@ -37,17 +37,21 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
 import merlin as ml
-import torch
-from lib.circuit_ir import CircuitIR, build_original_ir, set_weights
-import torch
 import perceval as pcvl
+import torch
+from lib.circuit_ir import (
+    BLOCK_ANSATZ_MIX,
+    BLOCK_ANSATZ_PHASE,
+    CircuitIR,
+    Element,
+    build_original_ir,
+    set_weights,
+)
 from merlin.models.qcnn import QCNNClassifier
-from lib.circuit_ir import CircuitIR, Element, BLOCK_ANSATZ_MIX, BLOCK_ANSATZ_PHASE
 from torch import nn
-from merlin.models.qcnn import QCNNClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +98,7 @@ class PhotonicQnnSpec:
 
     def resolved_input_state(self) -> list[int]:
         """Return entry state or generate a new state."""
-        
+
         if self.input_state:
             state = list(self.input_state)
             if len(state) != self.n_modes:
@@ -114,12 +118,12 @@ class PhotonicQnnSpec:
                 f"impossible to distribute {self.n_photons} photons in "
                 f"{self.n_modes} modes without bunch."
             )
-            
+
         state = [0] * self.n_modes
         for i in range(self.n_photons):
             index = int(i * (self.n_modes / self.n_photons))
             state[index] = 1
-            
+
         return state
 
     def as_dict(self) -> dict:
@@ -134,6 +138,7 @@ class PhotonicQnnSpec:
             "computation_space": self.computation_space,
             "input_state": self.resolved_input_state(),
         }
+
 
 def build_spec_ir(spec: PhotonicQnnSpec) -> CircuitIR:
     """Return the IR of the unmutated circuit described by ``spec``."""
@@ -329,12 +334,15 @@ class MutatableQCNN(QCNNClassifier):
     """QCNN Classifier wrapped to support topological mutation testing via IR."""
 
     def __init__(self, input_shape, num_classes, stages=None, ir_dict=None):
-        super().__init__(input_shape=input_shape, num_classes=num_classes, stages=stages)
-        
+        super().__init__(
+            input_shape=input_shape, num_classes=num_classes, stages=stages
+        )
+
         self.ir_dict = ir_dict
-        
+
         if self.ir_dict is not None:
             self._apply_mutated_ir()
+
     def export_ir(self) -> dict:
         """Export the optical structure into a dict"""
         if self.ir_dict is not None:
@@ -343,32 +351,54 @@ class MutatableQCNN(QCNNClassifier):
         extracted_ir = {}
         for idx, layer in enumerate(self.layers):
             target_circuit = None
-            if hasattr(layer, 'circuit') and layer.circuit is not None:
+            if hasattr(layer, "circuit") and layer.circuit is not None:
                 target_circuit = layer.circuit
-            elif hasattr(layer, 'processor') and layer.processor.circuit is not None:
+            elif hasattr(layer, "processor") and layer.processor.circuit is not None:
                 target_circuit = layer.processor.circuit
-                
+
             if target_circuit is None:
                 continue
-                
+
             elements = []
-            for (modes, component) in target_circuit._components:
+            for modes, component in target_circuit._components:
                 if isinstance(component, pcvl.PS):
-                    val = float(component.assign({}).phi) if hasattr(component, 'phi') else 0.0
-                    elements.append(Element(
-                        kind="ps", modes=modes, role="weight", value=val,
-                        feature_index=None, block=BLOCK_ANSATZ_PHASE, layer=0
-                    ))
+                    val = (
+                        float(component.assign({}).phi)
+                        if hasattr(component, "phi")
+                        else 0.0
+                    )
+                    elements.append(
+                        Element(
+                            kind="ps",
+                            modes=modes,
+                            role="weight",
+                            value=val,
+                            feature_index=None,
+                            block=BLOCK_ANSATZ_PHASE,
+                            layer=0,
+                        )
+                    )
 
                 elif isinstance(component, pcvl.BS):
-                    val = float(component.assign({}).theta) if hasattr(component, 'theta') else 0.0
-                    elements.append(Element(
-                        kind="bs", modes=modes, role="fixed", value=val,
-                        feature_index=None, block=BLOCK_ANSATZ_MIX, layer=0
-                    ))
+                    val = (
+                        float(component.assign({}).theta)
+                        if hasattr(component, "theta")
+                        else 0.0
+                    )
+                    elements.append(
+                        Element(
+                            kind="bs",
+                            modes=modes,
+                            role="fixed",
+                            value=val,
+                            feature_index=None,
+                            block=BLOCK_ANSATZ_MIX,
+                            layer=0,
+                        )
+                    )
 
             extracted_ir[idx] = CircuitIR(n_modes=target_circuit.m, elements=elements)
-            
+
         return extracted_ir
 
     def forward(self, x, shots=None, **kwargs):
@@ -377,8 +407,9 @@ class MutatableQCNN(QCNNClassifier):
         MerLin's QCNN analytically calculates exact probabilities by default.
         """
         logits = super().forward(x)
-        
+
         return logits
+
     def num_trainable_parameters(self) -> int:
         """Returns the total number of trainable parameters of the PyTorch model."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -387,12 +418,12 @@ class MutatableQCNN(QCNNClassifier):
         """Replaces the native optical circuits with the mutant's."""
         for layer_idx, ir_obj in self.ir_dict.items():
             layer = self.layers[int(layer_idx)]
-            
+
             mutated_circuit, _, _ = ir_obj.to_pcvl()
-            
-            if hasattr(layer, 'circuit'):
+
+            if hasattr(layer, "circuit"):
                 layer.circuit = mutated_circuit
-            elif hasattr(layer, 'processor'):
+            elif hasattr(layer, "processor"):
                 layer.processor.set_circuit(mutated_circuit)
             else:
                 raise AttributeError(f"No circuit on layer {layer_idx}")
@@ -406,5 +437,5 @@ class MutatableQCNN(QCNNClassifier):
             "trainable_parameters": self.num_trainable_parameters(),
             "n_layers": len(self.layers),
             "measurement_strategy": "QCNN native grouping",
-            "postselection": "none"
+            "postselection": "none",
         }

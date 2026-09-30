@@ -93,14 +93,14 @@ def _signature_hash(mutant: Mutant) -> str:
         payload = repr(mutant.feature_transform)
     elif isinstance(mutant.ir, dict):
         signatures = {
-            layer_idx: layer_ir.signature() 
-            for layer_idx, layer_ir in mutant.ir.items()
+            layer_idx: layer_ir.signature() for layer_idx, layer_ir in mutant.ir.items()
         }
         payload = repr(sorted(signatures.items()))
     else:
         payload = repr(mutant.ir.signature())
-        
+
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
+
 
 def _deterministic_seed(mutant_id: str) -> int:
     """Return a stable per-mutant seed so that sampled verdicts reproduce."""

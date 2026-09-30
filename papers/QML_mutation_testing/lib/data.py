@@ -13,16 +13,16 @@ from typing import Literal
 
 import numpy as np
 import torch
+import torchvision.datasets as datasets
 from sklearn.datasets import load_breast_cancer, load_iris, load_wine
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-import torchvision
-import torchvision.transforms as transforms
 
 logger = logging.getLogger(__name__)
 
 DatasetName = Literal["iris", "wine", "breast_cancer"]
+
 
 @dataclass(frozen=True)
 class DatasetSplits:
@@ -86,7 +86,7 @@ def load_tabular_splits(
     DatasetSplits
         Scaled tensors plus the mutation-suite subset.
     """
-    
+
     if name == "iris":
         features, labels = load_iris(return_X_y=True)
     elif name == "wine":
@@ -105,13 +105,18 @@ def load_tabular_splits(
 
     n_features = x_train.shape[1]
     n_classes = len(np.unique(labels))
-    
+
     valid_modes = n_features
     while math.comb(valid_modes, 2) % n_classes != 0:
         valid_modes -= 1
-        
+
     if valid_modes < n_features:
-        logger.info("PCA: %s reduced by %d to %d features for LexGrouping.", name, n_features, valid_modes)
+        logger.info(
+            "PCA: %s reduced by %d to %d features for LexGrouping.",
+            name,
+            n_features,
+            valid_modes,
+        )
         pca = PCA(n_components=valid_modes, random_state=seed).fit(x_train)
         x_train = pca.transform(x_train)
         x_val = pca.transform(x_val)
@@ -145,8 +150,11 @@ def load_tabular_splits(
         feature_max,
     )
 
-    to_x = lambda array: torch.tensor(array, dtype=torch.float32)
-    to_y = lambda array: torch.tensor(array, dtype=torch.long)
+    def to_x(array):
+        return torch.tensor(array, dtype=torch.float32)
+
+    def to_y(array):
+        return torch.tensor(array, dtype=torch.long)
 
     return DatasetSplits(
         x_train=to_x(x_train),
@@ -159,6 +167,7 @@ def load_tabular_splits(
         y_suite=to_y(y_test[suite_indices]),
         suite_indices=suite_indices,
     )
+
 
 def _stratified_subsample(labels: np.ndarray, n_samples: int, seed: int) -> np.ndarray:
     """Return indices of a class-balanced subsample of ``labels``."""
@@ -181,6 +190,7 @@ def _stratified_subsample(labels: np.ndarray, n_samples: int, seed: int) -> np.n
 
     return np.sort(np.array(selected, dtype=int))
 
+
 def load_image_splits(
     *,
     name: str = "mnist",
@@ -189,27 +199,36 @@ def load_image_splits(
     val_size: float = 0.2,
     n_suite_samples: int = 20,
 ) -> DatasetSplits:
-    """Load an image dataset (MNIST), resize to 4x4, and build splits."""
-    
-    transform = transforms.Compose([
-        transforms.Resize((4, 4)),
-        transforms.ToTensor(),
-    ])
+    """Load an image dataset, resize to 4x4, and build splits."""
 
     if name == "mnist":
-        dataset = torchvision.datasets.MNIST(
-            root="./data", train=True, download=True, transform=transform
-        )
+        ds_train = datasets.MNIST(root="./data", train=True, download=True)
+        ds_test = datasets.MNIST(root="./data", train=False, download=True)
+    elif name == "fashion_mnist":
+        ds_train = datasets.FashionMNIST(root="./data", train=True, download=True)
+        ds_test = datasets.FashionMNIST(root="./data", train=False, download=True)
+    elif name == "kmnist":
+        ds_train = datasets.KMNIST(root="./data", train=True, download=True)
+        ds_test = datasets.KMNIST(root="./data", train=False, download=True)
     else:
         raise ValueError(f"Unsupported image dataset: {name}")
 
-    features = dataset.data.float().unsqueeze(1) / 255.0  # Shape: (N, 1, 28, 28)
-    features = torch.nn.functional.interpolate(features, size=(4, 4), mode='area') # Shape: (N, 1, 4, 4)
+    raw_features = torch.cat([ds_train.data, ds_test.data], dim=0)
+    raw_targets = torch.cat([ds_train.targets, ds_test.targets], dim=0)
+
+    features = raw_features.float().unsqueeze(1) / 255.0  # Shape: (N, 1, 28, 28)
+    features = torch.nn.functional.interpolate(
+        features, size=(4, 4), mode="area"
+    )  # Shape: (N, 1, 4, 4)
     features = features + 1e-6
-    labels = dataset.targets
+    labels = raw_targets
 
     x_pool, x_test, y_pool, y_test = train_test_split(
-        features.numpy(), labels.numpy(), test_size=test_size, random_state=seed, stratify=labels.numpy()
+        features.numpy(),
+        labels.numpy(),
+        test_size=test_size,
+        random_state=seed,
+        stratify=labels.numpy(),
     )
     x_train, x_val, y_train, y_val = train_test_split(
         x_pool, y_pool, test_size=val_size, random_state=seed, stratify=y_pool
@@ -226,8 +245,11 @@ def load_image_splits(
         len(suite_indices),
     )
 
-    to_x = lambda array: torch.tensor(array, dtype=torch.float32)
-    to_y = lambda array: torch.tensor(array, dtype=torch.long)
+    def to_x(array):
+        return torch.tensor(array, dtype=torch.float32)
+
+    def to_y(array):
+        return torch.tensor(array, dtype=torch.long)
 
     return DatasetSplits(
         x_train=to_x(x_train),
